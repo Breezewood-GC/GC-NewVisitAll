@@ -4,7 +4,11 @@
 // @version      0.1
 // @description  Restores the "Visit All" Functionality for logging trackable visits to caches being logged online at Geocaching.com
 // @author       Breezewood
-// @match        https://www.geocaching.com/live/geocache/*
+// @match        http*://*.geocaching.com/live/geocache/*/draft/*/compose*
+// @include      http*://www.geocaching.com/live/geocache/*/draft/*/compose*
+// @include      http*://geocaching.com/live/geocache/*/draft/*/compose*
+// @include      http*://*.geocaching.com/live/geocache/*/draft/*/compose*
+// @include      http*://*.geocaching.com/live/geocache/*/log/*/edit*
 // @grant        none
 // ==/UserScript==
 
