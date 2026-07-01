@@ -1,10 +1,10 @@
 // ==UserScript==
 // @name         Geocaching - Restore "Visit All" Action Button
 // @namespace    http://tampermonkey.net
-// @version      3.3.0
-// @description  Restores the missing "Visit all" link to the inventory header. Displays only after "Show all" has been clicked.
+// @version      3.4.0
+// @description  Restores the missing "Visit all" link to the inventory header and footer. Displays and functions perfectly only after "Show all" has been clicked.
 // @author       You
-// @match        https://www.geocaching.com/*
+// @match        https://geocaching.com*
 // @license      GNU GPLv3
 // @grant        none
 // @run-at       document-start
@@ -41,8 +41,13 @@
         let lastScrollHeight = 0;
         let structuralStagnantCycles = 0;
 
-        statusLink.textContent = "Processing...";
-        statusLink.style.color = "#e67e22"; // Warm warning orange during operation
+        // Update all instances of the "Visit All" link text to "Processing..."
+        const allStatusLinks = document.querySelectorAll('.gclh-custom-visit-all-link');
+        allStatusLinks.forEach(link => {
+            link.textContent = "Processing...";
+            link.style.color = "#e67e22"; // Warm warning orange during operation
+        });
+        
         console.log("[Auto-Clicker] User triggered sequence. Beginning infinite-scroll processing pass...");
 
         const container = document.querySelector('ul.tb-list.gclh_TBsObserver') || 
@@ -62,7 +67,11 @@
                             triggerFrameworkSafeClick(button);
                             clickedInThisFrame++;
                             totalProcessed++;
-                            statusLink.textContent = `Visiting... (${totalProcessed})`;
+                            
+                            // Dynamically update the count on both links simultaneously
+                            allStatusLinks.forEach(link => {
+                                link.textContent = `Visiting... (${totalProcessed})`;
+                            });
                         }
                     } catch (rowErr) {}
                 });
@@ -82,8 +91,12 @@
                     structuralStagnantCycles++;
                     if (structuralStagnantCycles >= 10) { 
                         clearInterval(engineTimer);
-                        statusLink.textContent = `Visit All ✔ (${totalProcessed})`;
-                        statusLink.style.color = "#27ae60"; // Success Green
+                        
+                        // Set both links to success state green
+                        allStatusLinks.forEach(link => {
+                            link.textContent = `Visit All ✔ (${totalProcessed})`;
+                            link.style.color = "#27ae60"; 
+                        });
                         console.log(`[Auto-Clicker] 🏁 Sweep absolute. Processed: ${totalProcessed}`);
                     }
                 } else {
@@ -98,57 +111,54 @@
         }, tickInterval);
     }
 
-    // INTERLOCK: Coordinates list expansion before firing off scroll automation 
-    function handleUserVisitAllClick(e, statusLink) {
-        e.preventDefault();
-        runInfiniteScrollAndClick(statusLink);
-    }
-
-    // UI RESTORATION LAYER: Dynamically appends the button strictly when requested
-    function injectVisitAllButton(container) {
-        if (document.getElementById('gclh-custom-visit-all')) return;
-
-        console.log("[Auto-Clicker] Rendering manual 'Visit All' control element...");
-        
+    // UI RESTORATION LAYER: Safely builds an isolated link copy with complete click functionality
+    function injectVisitAllButton(containerElement) {
+        // Build matching styled button component matching Geocaching stylesheet designs
         const visitAllBtn = document.createElement('button');
-        visitAllBtn.id = 'gclh-custom-visit-all';
+        // Use a generic class so we can change texts together, but a unique ID per injection step
+        visitAllBtn.className = "gclh-custom-visit-all-link inline-block m-0 p-0 border-0 text-base bg-transparent font-input underline cursor-pointer text-blue-500 hover:no-underline";
         visitAllBtn.type = 'button';
         visitAllBtn.textContent = 'Visit All';
-        
-        // Copy Geocaching text styles directly from your template dump parameters
-        visitAllBtn.className = "inline-block m-0 p-0 border-0 text-base bg-transparent font-input underline cursor-pointer text-blue-500 hover:no-underline";
         visitAllBtn.style.marginLeft = "12px"; 
 
-        // Bind action
-        visitAllBtn.addEventListener('click', (e) => handleUserVisitAllClick(e, visitAllBtn));
+        // Bind click execution to the master engine handler
+        visitAllBtn.addEventListener('click', (e) => {
+            e.preventDefault();
+            runInfiniteScrollAndClick(visitAllBtn);
+        });
 
-        container.appendChild(visitAllBtn);
+        containerElement.appendChild(visitAllBtn);
     }
 
-    // WATCHDOG INTERCEPT: Stealthily listens for the click on "Show All" to trigger injection
+    // WATCHDOG INTERCEPT: Dynamically watches for the user to click "Show All" on any button row
     function attachShowAllListener() {
-        const showAllBtn = document.querySelector('button[data-event-label="Cache Log - show all"]') || 
-                           document.querySelector('button.gclh_hideTB_event');
+        // Query all instances of the "Show All" button (both top and bottom sections)
+        const showAllButtons = document.querySelectorAll('button[data-event-label="Cache Log - show all"], button.gclh_hideTB_event');
         
-        if (!showAllBtn) return;
-        if (showAllBtn.dataset.clickMonitorAttached === "true") return;
+        showAllButtons.forEach(showAllBtn => {
+            if (showAllBtn.dataset.clickMonitorAttached === "true") return;
 
-        const targetContainer = showAllBtn.closest('div.button-container') || showAllBtn.parentElement;
-        if (!targetContainer) return;
+            // Find the immediate parent button row layer container for this specific button
+            const targetContainer = showAllBtn.closest('div.button-container') || showAllBtn.parentElement;
+            if (!targetContainer) return;
 
-        showAllBtn.dataset.clickMonitorAttached = "true";
-        console.log("[Auto-Clicker] Production hook linked to 'Show all' button.");
+            showAllBtn.dataset.clickMonitorAttached = "true";
+            console.log("[Auto-Clicker] Production hook linked to a 'Show all' button container element.");
 
-        // Monitor when the button is actively clicked by the user
-        showAllBtn.addEventListener('click', () => {
-            // Instantly injects the "Visit All" link into the active row container
-            setTimeout(() => {
-                injectVisitAllButton(targetContainer);
-            }, 100);
+            // Monitor when this specific row is triggered by the user
+            showAllBtn.addEventListener('click', () => {
+                // Give the DOM a tiny 150ms window to clear rendering frames, then inject into the specific container
+                setTimeout(() => {
+                    // Check to make sure we haven't already added a button to this specific container row layout
+                    if (!targetContainer.querySelector('.gclh-custom-visit-all-link')) {
+                        injectVisitAllButton(targetContainer);
+                    }
+                }, 150);
+            });
         });
     }
 
-    // Watch DOM transformations to ensure everything stays hooked tightly
+    // Continuous background watch ensures footer clone buttons receive links if they inject late
     const uiObserver = new MutationObserver(() => attachShowAllListener());
     uiObserver.observe(document.documentElement, { childList: true, subtree: true });
 
