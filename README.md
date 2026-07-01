@@ -6,3 +6,4 @@ On July 23, 2025, Geocaching.com announced via the Community forums that the "Vi
 This script is an attempt to restore the functionality of the "Visit All" button while submitting cache logs.
 
 • Intitial version (08/13/2025): Initial file - Extremely broken | Establishing framework
+• Production ready code (06/30/2026) - reviewed initial functions (trashed a lot, added a lot)
