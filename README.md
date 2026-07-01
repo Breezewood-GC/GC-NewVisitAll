@@ -9,4 +9,4 @@ This script is an attempt to restore the functionality of the "Visit All" button
 
 • Production ready code (06/30/2026) - reviewed initial functions (trashed a lot, added a lot)
 
-• Huge progresses in the original production ready code. (6/30/2026) - Functionality is largely there but a pesky bug that prevents the code to correctly display "Visit All" if the "Show All" link is pressed/clicked before the page is fully loaded. This is due to Geocaching site js code that destroys the inventory header and replaces it with a fresh copy if this script is triggered before full page load.
+• Huge progresses in the original production ready code. (6/30/2026) - Functionality is largely there but a pesky bug exists that prevents the code to correctly display "Visit All" if the "Show All" link is pressed/clicked before the page is fully loaded. This is due to Geocaching site js code that destroys the inventory header and replaces it with a fresh copy if this script is triggered before full page load.
