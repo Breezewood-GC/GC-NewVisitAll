@@ -1,10 +1,11 @@
 // ==UserScript==
-// @name         Geocaching - Restore "Visit All" Action Button (Production)
+// @name         Geocaching - Restore "Visit All" Action Button
 // @namespace    http://tampermonkey.net
-// @version      3.2.0
+// @version      3.2.1
 // @description  Restores the missing "Visit all" link to the inventory header. Appears only after "Show all" is selected.
 // @author       You
 // @match        https://geocaching.com*
+// @license      GNU GPLv3
 // @grant        none
 // @run-at       document-start
 // ==/UserScript==
