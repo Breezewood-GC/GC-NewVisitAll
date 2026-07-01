@@ -1,6 +1,171 @@
 // ==UserScript==
 // @name         Geocaching - Restore "Visit All" Action Button
 // @namespace    http://tampermonkey.net
+// @version      3.4.1
+// @description  Restores the missing "Visit all" link precisely beside the native 'Show all' button, preserving 'Clear All' functionality.
+// @author       You
+// @match        https://www.geocaching.com/*
+// @license      GNU GPLv3
+// @grant        none
+// @run-at       document-start
+// ==/UserScript==
+
+(function() {
+    'use strict';
+
+    const targetActionText = 'visit';
+    const scrollAmount = 550; 
+    const tickInterval = 300; 
+
+    // Helper: Safely triggers hardware level events past NextJS hydration blocks
+    function triggerFrameworkSafeClick(element) {
+        if (!element) return;
+        try {
+            if (!element.id) {
+                element.id = "gclh_auto_generated_" + Math.random().toString(36).substr(2, 9);
+            }
+            ['pointerdown', 'mousedown', 'pointerup', 'mouseup', 'click'].forEach(type => {
+                const ev = new PointerEvent(type, {
+                    view: window, bubbles: true, cancelable: true, isTrusted: true, buttons: 1, relatedTarget: element
+                });
+                element.dispatchEvent(ev);
+            });
+        } catch (e) {
+            console.log("[Auto-Clicker Warning] Suppressed event click error.");
+        }
+    }
+
+    // CORE ENGINE: Automatically runs the sweeping pass through the expanded list
+    function runInfiniteScrollAndClick() {
+        let totalProcessed = 0;
+        let lastScrollHeight = 0;
+        let structuralStagnantCycles = 0;
+
+        // Update all instances of our specific custom link text to "Processing..."
+        const allStatusLinks = document.querySelectorAll('.gclh-custom-visit-all-link');
+        allStatusLinks.forEach(link => {
+            link.textContent = "Processing...";
+            link.style.color = "#e67e22"; // Warm warning orange during operation
+        });
+        
+        console.log("[Auto-Clicker] User triggered sequence. Beginning infinite-scroll processing pass...");
+
+        const container = document.querySelector('ul.tb-list.gclh_TBsObserver') || 
+                          document.querySelector('ul.tb-list') || 
+                          document.documentElement;
+
+        const engineTimer = setInterval(() => {
+            try {
+                const currentButtons = document.querySelectorAll('button');
+                let clickedInThisFrame = 0;
+
+                // 1. Scan and toggle viewport nodes
+                currentButtons.forEach(button => {
+                    try {
+                        const label = button.textContent.trim().toLowerCase();
+                        if (label === targetActionText && button.getAttribute('aria-checked') !== 'true') {
+                            triggerFrameworkSafeClick(button);
+                            clickedInThisFrame++;
+                            totalProcessed++;
+                            
+                            // Dynamically update the count on both links simultaneously
+                            allStatusLinks.forEach(link => {
+                                link.textContent = `Visiting... (${totalProcessed})`;
+                            });
+                        }
+                    } catch (rowErr) {}
+                });
+
+                // 2. Adjust dynamic container scrolling boundaries
+                let currentScrollHeight = 0;
+                if (container && container !== document.documentElement) {
+                    container.scrollTop += scrollAmount;
+                    currentScrollHeight = container.scrollHeight;
+                } else {
+                    window.scrollBy(0, scrollAmount);
+                    currentScrollHeight = document.documentElement.scrollHeight;
+                }
+
+                // 3. Termination evaluation
+                if (clickedInThisFrame === 0 && currentScrollHeight === lastScrollHeight) {
+                    structuralStagnantCycles++;
+                    if (structuralStagnantCycles >= 10) { 
+                        clearInterval(engineTimer);
+                        
+                        // Set both links to success state green
+                        allStatusLinks.forEach(link => {
+                            link.textContent = `Visit All ✔ (${totalProcessed})`;
+                            link.style.color = "#27ae60"; 
+                        });
+                        console.log(`[Auto-Clicker] 🏁 Sweep absolute. Processed: ${totalProcessed}`);
+                    }
+                } else {
+                    structuralStagnantCycles = 0;
+                }
+
+                lastScrollHeight = currentScrollHeight;
+
+            } catch (err) {
+                console.log("[Auto-Clicker Error] Main thread catch protected runtime loop.");
+            }
+        }, tickInterval);
+    }
+
+    // UI RESTORATION LAYER: Safely builds an isolated link node next to the target button element
+    function injectVisitAllButton(showAllBtn) {
+        const parent = showAllBtn.parentNode;
+        if (!parent || parent.querySelector('.gclh-custom-visit-all-link')) return;
+
+        console.log("[Auto-Clicker] Rendering manual 'Visit All' element text choice node...");
+        
+        const visitAllBtn = document.createElement('button');
+        visitAllBtn.className = "gclh-custom-visit-all-link inline-block m-0 p-0 border-0 text-base bg-transparent font-input underline cursor-pointer text-blue-500 hover:no-underline";
+        visitAllBtn.type = 'button';
+        visitAllBtn.textContent = 'Visit All';
+        visitAllBtn.style.marginLeft = "14px"; 
+
+        // Bind click execution to the master engine handler
+        visitAllBtn.addEventListener('click', (e) => {
+            e.preventDefault();
+            e.stopPropagation(); // Avoid event bleeding into native components
+            runInfiniteScrollAndClick();
+        });
+
+        // Insert precisely directly behind the clicked "Show all" button node structure
+        parent.insertBefore(visitAllBtn, showAllBtn.nextSibling);
+    }
+
+    // WATCHDOG INTERCEPT: Stealthily listens for the click on "Show All" to trigger injection
+    function attachShowAllListener() {
+        const showAllButtons = document.querySelectorAll('button[data-event-label="Cache Log - show all"], button.gclh_hideTB_event');
+        
+        showAllButtons.forEach(showAllBtn => {
+            if (showAllBtn.dataset.clickMonitorAttached === "true") return;
+            showAllBtn.dataset.clickMonitorAttached = "true";
+            
+            console.log("[Auto-Clicker] Production hook linked to a 'Show all' element.");
+
+            // Monitor when the button is actively clicked by the user
+            showAllBtn.addEventListener('click', () => {
+                // Instantly injects into the matching parent tier row layout 
+                setTimeout(() => {
+                    injectVisitAllButton(showAllBtn);
+                }, 150);
+            });
+        });
+    }
+
+    // Connect the layout thread monitor to process mutations in real-time
+    const uiObserver = new MutationObserver(() => attachShowAllListener());
+    uiObserver.observe(document.documentElement, { childList: true, subtree: true });
+
+    if (document.readyState === 'complete' || document.readyState === 'interactive') {
+        attachShowAllListener();
+    }
+})();
+// ==UserScript==
+// @name         Geocaching - Restore "Visit All" Action Button
+// @namespace    http://tampermonkey.net
 // @version      3.4.0
 // @description  Restores the missing "Visit all" link to the inventory header and footer. Displays and functions perfectly only after "Show all" has been clicked.
 // @author       You
