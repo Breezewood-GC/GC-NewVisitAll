@@ -1,10 +1,10 @@
 // ==UserScript==
 // @name         Geocaching - Restore "Visit All" Action Button
 // @namespace    http://tampermonkey.net
-// @version      3.2.3
-// @description  Restores the missing "Visit all" link to the inventory header. Appears safely only after "Show all" is active.
+// @version      3.3.0
+// @description  Restores the missing "Visit all" link to the inventory header. Displays only after "Show all" has been clicked.
 // @author       You
-// @match        https://geocaching.com*
+// @match        https://www.geocaching.com/*
 // @license      GNU GPLv3
 // @grant        none
 // @run-at       document-start
@@ -98,62 +98,61 @@
         }, tickInterval);
     }
 
-    // UI RESTORATION LAYER: Instantly drops element into position when state conditions pass validation
-    function injectVisitAllButton(containerElement) {
+    // INTERLOCK: Coordinates list expansion before firing off scroll automation 
+    function handleUserVisitAllClick(e, statusLink) {
+        e.preventDefault();
+        runInfiniteScrollAndClick(statusLink);
+    }
+
+    // UI RESTORATION LAYER: Dynamically appends the button strictly when requested
+    function injectVisitAllButton(container) {
         if (document.getElementById('gclh-custom-visit-all')) return;
 
-        console.log("[Auto-Clicker] State validation cleared. Injecting 'Visit All' element...");
+        console.log("[Auto-Clicker] Rendering manual 'Visit All' control element...");
         
         const visitAllBtn = document.createElement('button');
         visitAllBtn.id = 'gclh-custom-visit-all';
         visitAllBtn.type = 'button';
         visitAllBtn.textContent = 'Visit All';
         
-        // Match standard Geocaching text styles
+        // Copy Geocaching text styles directly from your template dump parameters
         visitAllBtn.className = "inline-block m-0 p-0 border-0 text-base bg-transparent font-input underline cursor-pointer text-blue-500 hover:no-underline";
         visitAllBtn.style.marginLeft = "12px"; 
 
-        visitAllBtn.addEventListener('click', () => runInfiniteScrollAndClick(visitAllBtn));
+        // Bind action
+        visitAllBtn.addEventListener('click', (e) => handleUserVisitAllClick(e, visitAllBtn));
 
-        containerElement.appendChild(visitAllBtn);
+        container.appendChild(visitAllBtn);
     }
 
-    // WATCHDOG STATE ENGINE: Evaluates layout transformation rules dynamically without element attachment hooks
-    function evaluateDisplayState() {
-        // 1. Locate the container subheader panel row
-        const targetContainer = document.querySelector('div.button-container');
-        if (!targetContainer) return;
-
-        // 2. Scan if the core list has already broken past its 20 default pagination restriction boundaries
-        const header = document.querySelector('h2.text-\\[0\\.875rem\\]');
-        let inventoryIsExpanded = false;
-
-        if (header) {
-            const text = header.textContent.toLowerCase();
-            // If the description header text no longer contains "showing 20", the user clicked "Show all"
-            if (!text.includes('showing 20 of')) {
-                inventoryIsExpanded = true;
-            }
-        }
-
-        // Alternative secondary confirmation check: If the native "Show all" button disappears, it means it's expanded
+    // WATCHDOG INTERCEPT: Stealthily listens for the click on "Show All" to trigger injection
+    function attachShowAllListener() {
         const showAllBtn = document.querySelector('button[data-event-label="Cache Log - show all"]') || 
                            document.querySelector('button.gclh_hideTB_event');
-        if (!showAllBtn) {
-            inventoryIsExpanded = true;
-        }
+        
+        if (!showAllBtn) return;
+        if (showAllBtn.dataset.clickMonitorAttached === "true") return;
 
-        // 3. Trigger deployment if state validation unlocks successfully
-        if (inventoryIsExpanded) {
-            injectVisitAllButton(targetContainer);
-        }
+        const targetContainer = showAllBtn.closest('div.button-container') || showAllBtn.parentElement;
+        if (!targetContainer) return;
+
+        showAllBtn.dataset.clickMonitorAttached = "true";
+        console.log("[Auto-Clicker] Production hook linked to 'Show all' button.");
+
+        // Monitor when the button is actively clicked by the user
+        showAllBtn.addEventListener('click', () => {
+            // Instantly injects the "Visit All" link into the active row container
+            setTimeout(() => {
+                injectVisitAllButton(targetContainer);
+            }, 100);
+        });
     }
 
-    // Connect the layout thread monitor to process mutations in real-time
-    const uiObserver = new MutationObserver(() => evaluateDisplayState());
+    // Watch DOM transformations to ensure everything stays hooked tightly
+    const uiObserver = new MutationObserver(() => attachShowAllListener());
     uiObserver.observe(document.documentElement, { childList: true, subtree: true });
 
     if (document.readyState === 'complete' || document.readyState === 'interactive') {
-        evaluateDisplayState();
+        attachShowAllListener();
     }
 })();
