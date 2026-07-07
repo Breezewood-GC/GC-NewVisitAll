@@ -1,25 +1,26 @@
 // ==UserScript==
-// @name Geocaching - Restore "visit all" action button
-// @namespace http://tampermonkey.net
-// @version 9.0.0
-// @description restores the missing inline "visit all" text link right beside the inventory master controls after expansion.
-// @author breezewood
-// @match https://geocaching.com*
-// @license gnu gplv3
-// @grant none
-// @run-at document-start
+// @name         Geocaching - Restore "Visit All" Action Button
+// @namespace    http://tampermonkey.net
+// @version      9.0.0
+// @description  Restores the missing inline "Visit All" text link right beside the inventory master controls after expansion.
+// @author       Breezewood
+// @match        https://www.geocaching.com/*
+// @license      GNU GPLv3
+// @grant        none
+// @run-at       document-start
 // ==/UserScript==
-
+ 
 (function() {
     'use strict';
-    
-    const targetactiontext = 'visit';
-    const scrollamount = 550;
-    const tickinterval = 300;
-    let enginetimer = null;
-
-    // helper: safely triggers hardware level events past nextjs hydration blocks
-    function triggerframeworksafeclick(element) {
+ 
+    const targetActionText = 'visit';
+    const scrollAmount = 550;
+    const tickInterval = 300;
+ 
+    let engineTimer = null;
+ 
+    // Helper: Safely triggers hardware level events past NextJS hydration blocks
+    function triggerFrameworkSafeClick(element) {
         if (!element) return;
         try {
             if (!element.id) {
@@ -27,117 +28,167 @@
             }
             ['pointerdown', 'mousedown', 'pointerup', 'mouseup', 'click'].forEach(type => {
                 const ev = new PointerEvent(type, {
-                    view: window,
-                    bubbles: true,
-                    cancelable: true,
-                    isTrusted: true,
-                    buttons: 1,
-                    relatedTarget: element
+                    view: window, bubbles: true, cancelable: true, isTrusted: true, buttons: 1, relatedTarget: element
                 });
                 element.dispatchEvent(ev);
             });
         } catch (e) {
-            console.log("[auto-clicker warning] suppressed event click error.");
+            console.log("[Auto-Clicker Warning] Suppressed event click error.");
         }
     }
-
-    // core engine: automatically runs the sweeping pass through the expanded list
-    function runinfinitescrollandclick() {
-        if (enginetimer) clearInterval(enginetimer);
-
+ 
+    // CORE ENGINE: Automatically runs the sweeping pass through the expanded list
+    function runInfiniteScrollAndClick() {
+        if (engineTimer) clearInterval(engineTimer);
+ 
         let totalProcessed = 0;
         let lastScrollHeight = 0;
         let structuralStagnantCycles = 0;
-
+ 
         const allStatusLinks = document.querySelectorAll('.gclh-custom-visit-all-link');
         allStatusLinks.forEach(link => {
-            link.textContent = "processing...";
-            link.style.color = "#e67e22"; // warning orange
-            link.dataset.executionstate = "running";
+            link.textContent = "Processing...";
+            link.style.color = "#e67e22"; // Warning orange
+            link.dataset.executionState = "running";
         });
-
-        console.log("[auto-clicker] sequence triggered. beginning inventory pass.");
-
-        enginetimer = setInterval(() => {
-            // Find all toggle buttons or dropdowns for trackables in the inventory
-            const inventoryContainers = document.querySelectorAll('.trackable-item-container'); 
-            
-            // If containers exist, process actions
-            if (inventoryContainers.length > 0) {
-                inventoryContainers.forEach(container => {
-                    const dropdownToggle = container.querySelector('.action-dropdown-toggle'); // Adjust class based on Geocaching.com exact DOM
-                    const actionOptions = container.querySelectorAll('.dropdown-menu-item'); // Adjust class for action lists
-                    
-                    if (dropdownToggle && !container.dataset.hasVisited) {
-                        triggerframeworksafeclick(dropdownToggle);
-                        
-                        // Select "Visit" from the dropdown options
-                        setTimeout(() => {
-                            actionOptions.forEach(opt => {
-                                if (opt.textContent.toLowerCase().includes(targetactiontext)) {
-                                    triggerframeworksafeclick(opt);
-                                    totalProcessed++;
-                                    container.dataset.hasVisited = "true";
-                                }
+ 
+        console.log("[Auto-Clicker] Sequence triggered. Beginning infinite-scroll processing pass...");
+ 
+        const container = document.querySelector('ul.tb-list') || document.documentElement;
+ 
+        engineTimer = setInterval(() => {
+            try {
+                const currentButtons = document.querySelectorAll('button');
+                let clickedInThisFrame = 0;
+ 
+                // 1. Scan and toggle viewport nodes
+                currentButtons.forEach(button => {
+                    try {
+                        const label = button.textContent.trim().toLowerCase();
+                        // Target individual item row selection options explicitly, skipping macro links
+                        if (label === targetActionText && button.getAttribute('aria-checked') !== 'true' && !button.classList.contains('gclh-custom-visit-all-link')) {
+                            triggerFrameworkSafeClick(button);
+                            clickedInThisFrame++;
+                            totalProcessed++;
+ 
+                            allStatusLinks.forEach(link => {
+                                link.textContent = `Visiting... (${totalProcessed})`;
                             });
-                        }, 50); // Small delay to allow dropdown render
-                    }
+                        }
+                    } catch (rowErr) {}
                 });
-            }
-
-            // Infinite Scroll Mechanics to trigger lazy loading
-            const currentScrollHeight = document.documentElement.scrollHeight;
-            window.scrollBy(0, scrollamount);
-
-            if (currentScrollHeight === lastScrollHeight) {
-                structuralStagnantCycles++;
-            } else {
-                structuralStagnantCycles = 0;
+ 
+                // 2. Adjust dynamic container scrolling boundaries
+                let currentScrollHeight = 0;
+                if (container && container !== document.documentElement) {
+                    container.scrollTop += scrollAmount;
+                    currentScrollHeight = container.scrollHeight;
+                } else {
+                    window.scrollBy(0, scrollAmount);
+                    currentScrollHeight = document.documentElement.scrollHeight;
+                }
+ 
+                // 3. Termination evaluation
+                if (clickedInThisFrame === 0 && currentScrollHeight === lastScrollHeight) {
+                    structuralStagnantCycles++;
+                    if (structuralStagnantCycles >= 10) {
+                        clearInterval(engineTimer);
+                        engineTimer = null;
+ 
+                        allStatusLinks.forEach(link => {
+                            link.textContent = `Visit All ✔ (${totalProcessed})`;
+                            link.style.color = "#27ae60"; // Success Green
+                            link.dataset.executionState = "complete";
+                        });
+                        console.log(`[Auto-Clicker] 🏁 Sweep absolute. Processed: ${totalProcessed}`);
+                    }
+                } else {
+                    structuralStagnantCycles = 0;
+                }
+ 
                 lastScrollHeight = currentScrollHeight;
+ 
+            } catch (err) {
+                console.log("[Auto-Clicker Error] Protected master execution loop from crash.");
             }
-
-            // Stop scrolling if we reach the bottom of the lazy-loaded container
-            if (structuralStagnantCycles > 5) {
-                clearInterval(enginetimer);
-                console.log(`[auto-clicker] completed. total trackables visited: ${totalProcessed}`);
-                
-                // Reset UI indicators
-                allStatusLinks.forEach(link => {
-                    link.textContent = "visited all";
-                    link.style.color = "#27ae60"; // success green
-                    link.dataset.executionstate = "completed";
-                });
-            }
-        }, tickinterval);
+        }, tickInterval);
     }
-
-    // Initialize observer to detect when the log page fully loads the trackable inventory
-    const observer = new MutationObserver((mutations) => {
-        mutations.forEach(mutation => {
-            if (mutation.addedNodes.length > 0) {
-                // Check if the added node corresponds to the trackable container
-                const isTrackableList = Array.from(mutation.addedNodes).some(node => 
-                    node.classList && node.classList.contains('trackables-section')
-                );
-                
-                if (isTrackableList && !document.querySelector('.gclh-custom-visit-all-link')) {
-                    // Re-inject your custom button here
-                    const controls = document.querySelector('.inventory-master-controls'); // Adjust selector as needed
-                    if (controls && !document.getElementById('custom-visit-all-btn')) {
-                        const btn = document.createElement('span');
-                        btn.id = 'custom-visit-all-btn';
-                        btn.className = 'gclh-custom-visit-all-link';
-                        btn.textContent = 'visit all';
-                        btn.style.cursor = 'pointer';
-                        btn.style.color = '#3498db';
-                        btn.style.marginLeft = '10px';
-                        btn.addEventListener('click', runinfinitescrollandclick);
-                        controls.appendChild(btn);
-                    }
+ 
+    // EVENT-BUBBLE RESET CAPTURE: Completely resets counters when a user selects a clearing action node
+    function resetVisitAllScript() {
+        console.log("[Auto-Clicker] Clearing signal captured. Resetting script parameters...");
+ 
+        if (engineTimer) {
+            clearInterval(engineTimer);
+            engineTimer = null;
+        }
+ 
+        const allStatusLinks = document.querySelectorAll('.gclh-custom-visit-all-link');
+        allStatusLinks.forEach(link => {
+            link.textContent = 'Visit All';
+            link.style.color = '#3b82f6'; // Reset back to theme blue
+            link.removeAttribute('data-execution-state');
+        });
+    }
+ 
+    // UI RESTORATION LAYER: Places the inline link choice cleanly right before the targeted button
+    function injectInlineVisitAllButton(masterDropBtn) {
+        const parent = masterDropBtn.parentNode;
+        if (!parent || parent.querySelector('.gclh-custom-visit-all-link')) return;
+ 
+        console.log("[Auto-Clicker] Target matched. Mounting Visit All text option inline...");
+ 
+        const visitAllBtn = document.createElement('button');
+        visitAllBtn.className = "gclh-custom-visit-all-link inline-block m-0 p-0 border-0 text-base bg-transparent font-input underline cursor-pointer text-blue-500 hover:no-underline";
+        visitAllBtn.type = 'button';
+        visitAllBtn.textContent = 'Visit All';
+ 
+        // Match margin alignments based on standard page text separation rules
+        visitAllBtn.style.marginRight = "12px";
+        visitAllBtn.style.display = "inline-block";
+ 
+        visitAllBtn.addEventListener('click', (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            if (visitAllBtn.dataset.executionState !== "running") {
+                runInfiniteScrollAndClick();
+            }
+        });
+ 
+        // Insert our inline choice cleanly right before the master macro button
+        parent.insertBefore(visitAllBtn, masterDropBtn);
+    }
+ 
+    // WATCHDOG ENGINE: Monitors layout mutations cleanly without creating element conflicts
+    function scanAndProcessState() {
+        const allButtons = document.querySelectorAll('button');
+ 
+        allButtons.forEach(button => {
+            const btnText = button.textContent.trim().toLowerCase();
+            const eventLabel = button.getAttribute('data-event-label') || '';
+ 
+            // PROVISION RESET LOGIC: Listens to any dynamic clear triggers or "No Action" options seamlessly
+            if (btnText === 'clear all' || btnText === 'clear-all' || btnText === 'no action' || eventLabel.includes('no action')) {
+                if (button.dataset.resetEventHooked !== "true") {
+                    button.dataset.resetEventHooked = "true";
+                    button.addEventListener('click', () => {
+                        setTimeout(resetVisitAllScript, 50);
+                    });
                 }
             }
+ 
+            // PROVISION MOUNTING LOGIC: Finds the master tool rows by matching custom labels or explicit button content
+            if (eventLabel === 'Cache Log - drop all' || btnText === 'drop all' || btnText === 'drop-all') {
+                injectInlineVisitAllButton(button);
+            }
         });
-    });
-
-    observer.observe(document.body, { childList: true, subtree: true });
+    }
+ 
+    // Register active page layout structural tracking observer pipeline
+    const uiObserver = new MutationObserver(() => scanAndProcessState());
+    uiObserver.observe(document.documentElement, { childList: true, subtree: true });
+ 
+    if (document.readyState === 'complete' || document.readyState === 'interactive') {
+        scanAndProcessState();
+    }
 })();
