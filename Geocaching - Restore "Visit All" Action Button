@@ -1,5 +1,5 @@
 // ==UserScript==
-// @name geocaching - restore "visit all" action button
+// @name Geocaching - Restore "visit all" action button
 // @namespace http://tampermonkey.net
 // @version 9.0.0
 // @description restores the missing inline "visit all" text link right beside the inventory master controls after expansion.
