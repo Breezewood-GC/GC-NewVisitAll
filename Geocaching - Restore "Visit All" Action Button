@@ -1,15 +1,13 @@
 // ==UserScript==
-// @name        Geocaching - Trackables - Restore "Visit All" Action Button
-// @namespace   http://tampermonkey.net
-// @version     9.0.1
+// @name geocaching - restore "visit all" action button
+// @namespace http://tampermonkey.net
+// @version 9.0.0
 // @description restores the missing inline "visit all" text link right beside the inventory master controls after expansion.
-// @author      breezewood
-// @match       https://geocaching.com*
-// @license     gnu gplv3
-// @grant       none
-// @run-at      document-start
-// @downloadURL https://update.greasyfork.org/scripts/585063/Geocaching%20-%20Trackables%20-%20Restore%20%22Visit%20All%22%20Action%20Button.user.js
-// @updateURL https://update.greasyfork.org/scripts/585063/Geocaching%20-%20Trackables%20-%20Restore%20%22Visit%20All%22%20Action%20Button.meta.js
+// @author breezewood
+// @match https://geocaching.com*
+// @license gnu gplv3
+// @grant none
+// @run-at document-start
 // ==/UserScript==
 
 (function() {
